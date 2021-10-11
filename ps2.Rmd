@@ -318,10 +318,13 @@ ggplot(performance_diff_summary_d, aes(x=ConfrontationalGame, y=MeanImprovementS
 ```{r TamirFig2SEM, echo=TRUE}
 ## Bonus: calculate SEM and add error bars
 performance_diff_summary_d = performance_diff_d |>
-  na.omit() |> ## remove NA's before grouping/averaging (omit beforehand to account for mean, sd, and sqrt functions)
+  ## remove NA's before grouping/averaging 
+  na.omit() |> ## (omit beforehand to account for mean, sd, and sqrt functions)
   group_by(ConfrontationalGame, MusicCondition) |>
-  mutate(MeanImprovementScore = mean(ImprovementScore)) |>
-  mutate(SEMImprovementScore = sd(ImprovementScore) / sqrt(length(ImprovementScore)))
+  summarize(MeanImprovementScore = mean(ImprovementScore), 
+            sd = sd(ImprovementScore), 
+            n = n(), 
+            SEMImprovementScore = sd/sqrt(n))
 
 ggplot(performance_diff_summary_d, aes(x=ConfrontationalGame, y=MeanImprovementScore, fill=MusicCondition)) +
   geom_bar(position="dodge", stat="identity") + 
