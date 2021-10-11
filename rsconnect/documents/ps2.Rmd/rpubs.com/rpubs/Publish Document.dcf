@@ -1,0 +1,11 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/820367/7558de8a31c54a17bcb4f91a1ebc2e05
+bundleId: https://api.rpubs.com/api/v1/document/820367/7558de8a31c54a17bcb4f91a1ebc2e05
+url: http://rpubs.com/shawnschwartz/820367
+when: 1633912011.9166
+lastSyncTime: 1633912011.91661

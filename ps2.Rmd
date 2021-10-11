@@ -242,8 +242,7 @@ The rating hypothesis analysis also requires some grouped manipulation. The expe
 rating_summary_d = rating_hyp_long_d |>
   ## your code here
   group_by(ConfrontationalGame, Emotion) |>
-  summarize(MeanRating = mean(Rating, na.rm=T)) |>
-  ungroup()
+  summarize(MeanRating = mean(Rating, na.rm=T))
 ```
 
 Let's take a look at the result:
@@ -297,8 +296,7 @@ Now we're finally to reproduce Fig. 2 from Tamir et al., we just need to get the
 performance_diff_summary_d = performance_diff_d |>
   ## Your code here
   group_by(ConfrontationalGame, MusicCondition) |>
-  summarize(MeanImprovementScore = mean(ImprovementScore, na.rm=T)) |>
-  ungroup()
+  summarize(MeanImprovementScore = mean(ImprovementScore, na.rm=T))
 ```
 
 Let's take a look at your result (if it has `NA` values, how can you fix it?):
@@ -323,8 +321,7 @@ performance_diff_summary_d = performance_diff_d |>
   na.omit() |> ## remove NA's before grouping/averaging (omit beforehand to account for mean, sd, and sqrt functions)
   group_by(ConfrontationalGame, MusicCondition) |>
   mutate(MeanImprovementScore = mean(ImprovementScore)) |>
-  mutate(SEMImprovementScore = sd(ImprovementScore) / sqrt(length(ImprovementScore))) |>
-  ungroup()
+  mutate(SEMImprovementScore = sd(ImprovementScore) / sqrt(length(ImprovementScore)))
 
 ggplot(performance_diff_summary_d, aes(x=ConfrontationalGame, y=MeanImprovementScore, fill=MusicCondition)) +
   geom_bar(position="dodge", stat="identity") + 

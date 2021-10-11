@@ -1373,12 +1373,12 @@ head(rating_hyp_long_d)</code></pre>
 <pre class="r"><code>rating_summary_d = rating_hyp_long_d |&gt;
   ## your code here
   group_by(ConfrontationalGame, Emotion) |&gt;
-  summarize(MeanRating = mean(Rating, na.rm=T)) |&gt;
-  ungroup()</code></pre>
+  summarize(MeanRating = mean(Rating, na.rm=T))</code></pre>
 <pre><code>## `summarise()` has grouped output by &#39;ConfrontationalGame&#39;. You can override using the `.groups` argument.</code></pre>
 <p>Let’s take a look at the result:</p>
 <pre class="r"><code>rating_summary_d</code></pre>
 <pre><code>## # A tibble: 6 × 3
+## # Groups:   ConfrontationalGame [2]
 ##   ConfrontationalGame Emotion  MeanRating
 ##   &lt;lgl&gt;               &lt;chr&gt;         &lt;dbl&gt;
 ## 1 FALSE               Angry          2.72
@@ -1456,12 +1456,12 @@ summary(model)</code></pre>
 <pre class="r"><code>performance_diff_summary_d = performance_diff_d |&gt;
   ## Your code here
   group_by(ConfrontationalGame, MusicCondition) |&gt;
-  summarize(MeanImprovementScore = mean(ImprovementScore, na.rm=T)) |&gt;
-  ungroup()</code></pre>
+  summarize(MeanImprovementScore = mean(ImprovementScore, na.rm=T))</code></pre>
 <pre><code>## `summarise()` has grouped output by &#39;ConfrontationalGame&#39;. You can override using the `.groups` argument.</code></pre>
 <p>Let’s take a look at your result (if it has <code>NA</code> values, how can you fix it?):</p>
 <pre class="r"><code>performance_diff_summary_d</code></pre>
 <pre><code>## # A tibble: 6 × 3
+## # Groups:   ConfrontationalGame [2]
 ##   ConfrontationalGame MusicCondition MeanImprovementScore
 ##   &lt;lgl&gt;               &lt;fct&gt;                         &lt;dbl&gt;
 ## 1 FALSE               Anger                       -0.179 
@@ -1481,8 +1481,7 @@ performance_diff_summary_d = performance_diff_d |&gt;
   na.omit() |&gt; ## remove NA&#39;s before grouping/averaging (omit beforehand to account for mean, sd, and sqrt functions)
   group_by(ConfrontationalGame, MusicCondition) |&gt;
   mutate(MeanImprovementScore = mean(ImprovementScore)) |&gt;
-  mutate(SEMImprovementScore = sd(ImprovementScore) / sqrt(length(ImprovementScore))) |&gt;
-  ungroup()
+  mutate(SEMImprovementScore = sd(ImprovementScore) / sqrt(length(ImprovementScore)))
 
 ggplot(performance_diff_summary_d, aes(x=ConfrontationalGame, y=MeanImprovementScore, fill=MusicCondition)) +
   geom_bar(position=&quot;dodge&quot;, stat=&quot;identity&quot;) + 
