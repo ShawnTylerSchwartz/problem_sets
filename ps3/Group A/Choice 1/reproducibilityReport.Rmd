@@ -1,5 +1,7 @@
 ---
 title: "Reproducibility Report: Group A Choice 1"
+author: "Shawn T. Schwartz"
+date: "November 3, 2021"
 output:
   html_document:
     toc: true
@@ -35,23 +37,30 @@ library(tidyverse) # for data munging
 library(knitr) # for kable table formating
 library(haven) # import and export 'SPSS', 'Stata' and 'SAS' Files
 library(readxl) # import excel files
-
-# #optional packages:
-# library(broom)
-# library(labelled)# converts SPSS's labelled to R's factor 
 ```
 
 # Step 2: Load data
 
 ```{r}
-# Just Study 1
+## Just Study 1
 d <- read_sav('data/Empathy Gap Study 1 data.sav')
 ```
 
 # Step 3: Tidy data
 
 ```{r}
+## confirm participant counts reported in paper
+nrow(d) == 132
+nrow(subset(d, gender == 0)) == 65 ## male
+nrow(subset(d, gender == 1)) == 64 ## female
+sum(is.na(d$gender)) == 3 ## unreported
 
+## convert to long format
+d_long <- d |>
+  select(ID, condition, exchangeinfo) |> ## grab relevant columns
+  pivot_longer(cols = c("exchangeinfo"),
+               names_to = "Measurement",
+               values_to = "Value")
 ```
 
 # Step 4: Run analysis
@@ -61,8 +70,30 @@ d <- read_sav('data/Empathy Gap Study 1 data.sav')
 > Only 10 of the 61 participants in the hypothetical condition chose to exchange contact information with the unattractive potential date (16%). In contrast, 26 of the 71 participants in the real condition chose to exchange contact information (37%).
 
 ```{r}
-# reproduce the above results here
+## reproduce the above results here
 
+### get data for hypothetical condition
+d_hyp_cond <- d_long |>
+  filter(condition == 0) |> ## filter out non-hypothetical conditions
+  {function(x) table(x$Value)}() |> ## anonymous function to get counts for response value
+  {function(x) (x[1] / sum(x))}() |> ## anonymous function to get proportion of yes to total responses
+  round(2) ## round response to 2 significant digits
+
+## confirm hypothetical condition results
+print(d_hyp_cond)
+d_hyp_cond == .16 ## 16%
+
+
+### get data for real condition
+d_real_cond <- d_long |>
+  filter(condition == 1) |> ## filter out non-real conditions
+  {function(x) table(x$Value)}() |> ## anonymous function to get counts for response value
+  {function(x) (x[1] / sum(x))}() |> ## anonymous function to get proportion of yes to total responses
+  round(2) ## round response to 2 significant digits
+
+## confirm hypothetical condition results
+print(d_real_cond)
+d_real_cond == .37 ## 37%
 ```
 
 ## Inferential statistics
@@ -71,21 +102,17 @@ d <- read_sav('data/Empathy Gap Study 1 data.sav')
 
 ```{r}
 # reproduce the above results here
-
+chisq.test(d_long$condition, d_long$Value, correct = FALSE)
 ```
 
 # Step 5: Reflection
 
-Were you able to reproduce the results you attempted to reproduce? If not, what part(s) were you unable to reproduce?
+**Were you able to reproduce the results you attempted to reproduce? If not, what part(s) were you unable to reproduce?**
 
-> ANSWER HERE
+Yes, I was able to reproduce the results in their entirety.
 
-How difficult was it to reproduce your results? 
+**How difficult was it to reproduce your results? What aspects made it difficult? What aspects made it easy?**
 
-> ANSWER HERE
-
-What aspects made it difficult? What aspects made it easy?
-
-> ANSWER HERE
+Not difficult at all, especially since the authors clearly described the columns for the key independent and dependent variables in their dataset. Though, one thing to note was that I had to turn off the Yates' continuity correction for the `chisq.test` function so that the *p*-value and *X-squared* test statistic exactly matched the results reported in the paper.
 
 
