@@ -1,9 +1,12 @@
 ---
 title: "Reproducibility Report: Group B Choice 2"
+author: "Shawn T. Schwartz"
+date: "November 3, 2021"
 output:
   html_document:
     toc: true
     toc_float: true
+    toc_depth: 5
 ---
 
 -------
@@ -12,7 +15,7 @@ For this exercise, please try to reproduce the results from Experiment 1 of the 
 
 #### Methods summary: 
 
-A sense of power has often been tied to how we perceive each other's voice. Social hierarchy is embedded into the structure of society and provides a metric by which others relate to one another. In 1956, the Brunswik Lens Model was introduced to examine how vocal cues might influence hierarchy. In "The Sound of Power: Conveying and Detecting Hierarchical Rank Through Voice," Ko and colleagues investigated how manipulation of hierarchal rank within a situation might impact vocal acoustic cues. Using the Brunswik Model, six acoustic metrics were utilized (pitch mean & variability, loudness mean & variability, and resonance mean & variability) to isolate a potential contribution between individuals of different hierarchal rank. In the first experiment, Ko, Sadler & Galinsky examined the vocal acoustic cues of individuals before and after being assigned a hierarchal rank in a sample of 161 subjects (80 male). Each of the six hierarchy acoustic cues were analyzed with a 2 (high vs. low rank condition) x 2 (male vs. female) analysis of covariance, controlling for the baseline of the respective acoustic cue.
+A sense of power has often been tied to how we perceive each other's voice. Social hierarchy is embedded into the structure of society and provides a metric by which others relate to one another. In 1956, the Brunswik Lens Model was introduced to examine how vocal cues might influence hierarchy. In "The Sound of Power: Conveying and Detecting Hierarchical Rank Through Voice," Ko and colleagues investigated how manipulation of hierarchical rank within a situation might impact vocal acoustic cues. Using the Brunswik Model, six acoustic metrics were utilized (pitch mean & variability, loudness mean & variability, and resonance mean & variability) to isolate a potential contribution between individuals of different hierarchal rank. In the first experiment, Ko, Sadler & Galinsky examined the vocal acoustic cues of individuals before and after being assigned a hierarchical rank in a sample of 161 subjects (80 male). Each of the six hierarchy acoustic cues were analyzed with a 2 (high vs. low rank condition) x 2 (male vs. female) analysis of covariance, controlling for the baseline of the respective acoustic cue.
 
 ------
 
@@ -37,26 +40,51 @@ library(tidyverse) # for data munging
 library(knitr) # for kable table formating
 library(haven) # import and export 'SPSS', 'Stata' and 'SAS' Files
 library(readxl) # import excel files
-
-# #optional packages:
-# library(psych)
-# library(car) # for ANCOVA
-# library(compute.es) # for ANCOVA
-# library(lsmeans) # for ANCOVA
+library(car) # for ANCOVA
+library(effectsize) # for calculating effect size
+library(emmeans) # for estimating marginal means
 ```
 
 ## Step 2: Load data
 
 ```{r}
 # Just Experiment 1
-d <-read_csv("data/S1_voice_level_Final.csv")
-# DT::datatable(d)
+d <- read_csv("data/S1_voice_level_Final.csv")
+
+## render data in markdown
+DT::datatable(d)
 ```
 
 ## Step 3: Tidy data
 
 ```{r}
+## confirm participant counts reported in paper
+nrow(d) == 161
+nrow(subset(d, sex == "M")) == 80 ## male
+nrow(subset(d, sex == "F")) == 81 ## female
 
+## key variables from codebook:
+### voice = voice identification number
+### plev = hierarchy rank (+1 = high, -1 = low)
+### vsex = speaker sex (+1 = female, -1 = male)
+### ‘_s’ = script, acoustics recorded while saying negotiation script
+### ‘_r’ = rainbow, acoustics recorded during rainbow passage
+### ‘mean’ = average value of acoustic during a clip
+### ‘var’ = variance for acoustic during a clip
+### pitch = "pitch_..."
+### loudness = "intense_..."
+### resonance = "form_..."
+
+### sort data by high/low-rank
+d_high <- filter(d, plev == 1)
+d_low <- filter(d, plev == -1)
+
+## grab relevant columns
+d_subset <- d |>
+  select(voice, plev, vsex, 
+         starts_with("pitch"), 
+         starts_with("intense"), 
+         starts_with("form"))
 ```
 
 ## Step 4: Run analysis
@@ -64,16 +92,226 @@ d <-read_csv("data/S1_voice_level_Final.csv")
 ### Pre-processing
 
 ```{r}
+### create helper functions to facilitate analysis
 
+get_model <- function(dv = c("pitch", "intense", "form"),
+                      type = c("mean", "var"),
+                      data = d_subset)
+{
+  ## dynamic function to build out model based on dv
+  fit <- lm(formula = as.formula(
+                        paste(paste0(dv, "_s", type), "~", 
+                        paste(paste0(dv, "_r", type), "+", "plev*vsex"))), 
+                      data = data)
+  
+  return(fit)
+}
+
+run_ancova <- function(fit)
+{
+  ## run ANCOVA
+  ancova <- car::Anova(fit, type = "III")
+  
+  return(ancova)
+}
+
+get_adj_means <- function(fit,
+                          dv = c("pitch", "intense", "form"),
+                          type = c("mean", "var"),
+                          data = d_subset)
+{
+  ## dynamically construct estimated marginal means formula based on dv
+  estimated_means <- emmeans::emmeans(fit, 
+                                      paste0(dv, "_r", type),
+                                      by = "plev",
+                                      data = data)
+  
+  return(estimated_means)
+}
+
+get_es <- function(ancova)
+{
+  ## calculate effect size and suppress type 3 anova message that eta_squared returns
+  ##  (to make the output pretty!)
+  es <- suppressMessages(effectsize::eta_squared(ancova, partial = TRUE))
+  es_rounded <- round(es$Eta2_partial[2], 2) ## round result to 2 significant figures to match paper's output in table 4
+  
+  return(es_rounded)
+}
+
+get_adj_means_by_rank <- function(adj_means, rank = c("low", "high"))
+{
+  if(rank == "low")
+  {
+    return(round(summary(adj_means)$emmean[1], 2))
+  } else if(rank == "high")
+  {
+    return(round(summary(adj_means)$emmean[2], 2))
+  } else {
+    return(error("Invalid rank specified... please use 'low' or 'high' options!"))
+  }
+}
+
+reconstruct_ancova_results <- function(ancova)
+{
+  df_1 <- ancova[3,2]
+  df_2 <- ancova[6,2]
+  F_stat <- ancova[3,3]
+  p_stat <- ancova[3,4]
+  
+  results_string <- paste0("F(", df_1, ", ", df_2, ") = ", round(F_stat, 2), " p = ", round(p_stat, 3))
+  
+  return(results_string)
+}
+```
+
+### Compute All Models
+```{r}
+## pitch mean
+pitch_mean_model <- get_model("pitch", "mean")
+pitch_mean_ancova <- run_ancova(pitch_mean_model)
+pitch_mean_adjmeans <- get_adj_means(pitch_mean_model, "pitch", "mean")
+pitch_mean_es <- get_es(pitch_mean_ancova)
+
+## pitch variability
+pitch_var_model <- get_model("pitch", "var")
+pitch_var_ancova <- run_ancova(pitch_var_model)
+pitch_var_adjmeans <- get_adj_means(pitch_var_model, "pitch", "var")
+pitch_var_es <- get_es(pitch_var_ancova)
+
+## loudness
+loudness_mean_model <- get_model("intense", "mean")
+loudness_mean_ancova <- run_ancova(loudness_mean_model)
+loudness_mean_adjmeans <- get_adj_means(loudness_mean_model, "intense", "mean")
+loudness_mean_es <- get_es(loudness_mean_ancova)
+
+## loudness variability
+loudness_var_model <- get_model("intense", "var")
+loudness_var_ancova <- run_ancova(loudness_var_model)
+loudness_var_adjmeans <- get_adj_means(loudness_var_model, "intense", "var")
+loudness_var_es <- get_es(loudness_var_ancova)
+
+## resonance
+resonance_mean_model <- get_model("form", "mean")
+resonance_mean_ancova <- run_ancova(resonance_mean_model)
+resonance_mean_adjmeans <- get_adj_means(resonance_mean_model, "form", "mean")
+resonance_mean_es <- get_es(resonance_mean_ancova)
+
+## resonance variability
+resonance_var_model <- get_model("form", "var")
+resonance_var_ancova <- run_ancova(resonance_var_model)
+resonance_var_adjmeans <- get_adj_means(resonance_var_model, "form", "var")
+resonance_var_es <- get_es(resonance_var_ancova)
 ```
 
 ### Descriptive statistics
 
 In the paper, the adjusted means by condition are reported (see Table 4, or Table4_AdjustedMeans.png, included in the same folder as this Rmd file). Reproduce these values below:
 
+#### pitch mean
 ```{r}
+## adjusted means (high-rank condition)
+get_adj_means_by_rank(pitch_mean_adjmeans, "high")
 
+## adjusted means (low-rank condition)
+get_adj_means_by_rank(pitch_mean_adjmeans, "low")
+
+## effect size
+pitch_mean_es
 ```
+
+#### pitch variability
+```{r}
+## adjusted means (high-rank condition)
+get_adj_means_by_rank(pitch_var_adjmeans, "high")
+
+## adjusted means (low-rank condition)
+get_adj_means_by_rank(pitch_var_adjmeans, "low")
+
+## effect size
+pitch_var_es
+```
+
+#### loudness mean
+```{r}
+## adjusted means (high-rank condition)
+get_adj_means_by_rank(loudness_mean_adjmeans, "high")
+
+## adjusted means (low-rank condition)
+get_adj_means_by_rank(loudness_mean_adjmeans, "low")
+
+## effect size
+loudness_mean_es
+```
+
+#### loudness variability
+```{r}
+## adjusted means (high-rank condition)
+get_adj_means_by_rank(loudness_var_adjmeans, "high")
+
+## adjusted means (low-rank condition)
+get_adj_means_by_rank(loudness_var_adjmeans, "low")
+
+## effect size
+loudness_var_es
+```
+
+#### resonance mean
+```{r}
+## adjusted means (high-rank condition)
+get_adj_means_by_rank(resonance_mean_adjmeans, "high")
+
+## adjusted means (low-rank condition)
+get_adj_means_by_rank(resonance_mean_adjmeans, "low")
+
+## effect size
+resonance_mean_es
+```
+
+#### resonance variability
+```{r}
+## adjusted means (high-rank condition)
+get_adj_means_by_rank(resonance_var_adjmeans, "high")
+
+## adjusted means (low-rank condition)
+get_adj_means_by_rank(resonance_var_adjmeans, "low")
+
+## effect size
+resonance_var_es
+```
+
+#### Reconstruct Table 4
+```{r}
+Acoustic_cue <- c("Pitch", "Pitch Variability", "Loudness", "Loudness Variability",
+                  "Resonance", "Resonance Variability")
+
+High_rank_condition <- c(get_adj_means_by_rank(pitch_mean_adjmeans, "high"),
+                         get_adj_means_by_rank(pitch_var_adjmeans, "high"),
+                         get_adj_means_by_rank(loudness_mean_adjmeans, "high"),
+                         get_adj_means_by_rank(loudness_var_adjmeans, "high"),
+                         get_adj_means_by_rank(resonance_mean_adjmeans, "high"),
+                         get_adj_means_by_rank(resonance_var_adjmeans, "high"))
+
+Low_rank_condition <- c(get_adj_means_by_rank(pitch_mean_adjmeans, "low"),
+                         get_adj_means_by_rank(pitch_var_adjmeans, "low"),
+                         get_adj_means_by_rank(loudness_mean_adjmeans, "low"),
+                         get_adj_means_by_rank(loudness_var_adjmeans, "low"),
+                         get_adj_means_by_rank(resonance_mean_adjmeans, "low"),
+                         get_adj_means_by_rank(resonance_var_adjmeans, "low"))
+
+Effect_of_condition <- c(pitch_mean_es, pitch_var_es, 
+                         loudness_mean_es, loudness_var_es,
+                         resonance_mean_es, resonance_var_es)
+
+table4_reconstruction <- data.frame("Acoustic cue" = Acoustic_cue,
+                                    "High-rank condition" = High_rank_condition,
+                                    "Low-rank condition" = Low_rank_condition,
+                                    "Effect of condition" = Effect_of_condition)
+
+DT::datatable(table4_reconstruction)
+```
+### Original Table 4 from paper
+![](Table4_AdjustedMeans.png)
 
 ### Inferential statistics
 
@@ -82,18 +320,35 @@ In the paper, the adjusted means by condition are reported (see Table 4, or Tabl
 ```{r}
 # reproduce the above results here
 
+## pitch mean
+reconstruct_ancova_results(pitch_mean_ancova)
+
+## pitch variability
+reconstruct_ancova_results(pitch_var_ancova)
+
+## loudness
+reconstruct_ancova_results(loudness_mean_ancova)
+
+## loudness variability
+reconstruct_ancova_results(loudness_var_ancova)
+
+## resonance
+reconstruct_ancova_results(resonance_mean_ancova)
+
+## resonance variability
+reconstruct_ancova_results(resonance_var_ancova)
 ```
 
-# Step 5: Reflection
+## Step 5: Reflection
 
-Were you able to reproduce the results you attempted to reproduce? If not, what part(s) were you unable to reproduce?
+**Were you able to reproduce the results you attempted to reproduce? If not, what part(s) were you unable to reproduce?**
 
-> ANSWER HERE
+Yes, I was able to successfully reproduce all of the results of this paper in their entirety.
 
-How difficult was it to reproduce your results? 
+**How difficult was it to reproduce your results?**
 
-> ANSWER HERE
+Not very difficult; the only challenging component was figuring out which columns in the original dataset corresponded with the correct constructs being reported in the paper/the original figure. I also had to ensure that I knew which variables were the baseline and which weren't to properly setup the models.
 
-What aspects made it difficult? What aspects made it easy?
+**What aspects made it difficult? What aspects made it easy?**
 
-> ANSWER HERE
+One of the most annoying issues I found was that in the original paper (Table 4), the authors reported eta-squared as the header for the table; however, the actual values that were computed were partial eta-squared effect sizes, which I caught when noticing initially that the numbers were off when I first computed full eta-squared effect sizes as I would have expected based on the header used in the table. Nonetheless, calculating partial eta-squared effect sizes resulted in the correct results reported in Table 4.
